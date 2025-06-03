@@ -59,23 +59,56 @@ class IMDbQueries:
             return [dict(zip(columns, row)) for row in rows]
     
     def search_movies(self, search_term: str, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
-        """Search for movies by title"""
+        """Search for movies by title with exact matches first"""
         with self._get_connection() as conn:
             query = """
-                SELECT tconst, primaryTitle, originalTitle, startYear, runtimeMinutes, genres
+                SELECT tconst, primaryTitle, originalTitle, startYear, runtimeMinutes, genres,
+                    -- Ranking for search relevance (lower number = higher priority)
+                    CASE 
+                        WHEN LOWER(primaryTitle) = LOWER(?) THEN 1
+                        WHEN LOWER(originalTitle) = LOWER(?) THEN 1
+                        WHEN LOWER(primaryTitle) LIKE LOWER(?) THEN 2
+                        WHEN LOWER(originalTitle) LIKE LOWER(?) THEN 2
+                        WHEN LOWER(primaryTitle) LIKE LOWER(?) THEN 3
+                        WHEN LOWER(originalTitle) LIKE LOWER(?) THEN 3
+                        ELSE 4
+                    END as search_rank
                 FROM movies 
-                WHERE (primaryTitle LIKE ? OR originalTitle LIKE ?) 
+                WHERE (LOWER(primaryTitle) LIKE LOWER(?) OR LOWER(originalTitle) LIKE LOWER(?)) 
                     AND primaryTitle IS NOT NULL 
                     AND (startYear IS NULL OR startYear <= 2025)
-                ORDER BY startYear DESC
+                ORDER BY search_rank ASC, startYear DESC
                 LIMIT ? OFFSET ?
             """
-            search_pattern = f"%{search_term}%"
+            
+            # Prepare search patterns
+            exact_match = search_term
+            starts_with = f"{search_term}%"
+            contains = f"%{search_term}%"
+            
             cursor = conn.cursor()
-            cursor.execute(query, (search_pattern, search_pattern, limit, offset))
+            cursor.execute(query, (
+                exact_match, exact_match,           # Exact match check
+                starts_with, starts_with,           # Starts with check  
+                contains, contains,                 # Contains check
+                contains, contains,                 # WHERE clause
+                limit, offset
+            ))
+            
             columns = [description[0] for description in cursor.description]
             rows = cursor.fetchall()
-            return [dict(zip(columns, row)) for row in rows]
+            
+            # Remove the search_rank column from results
+            filtered_columns = [col for col in columns if col != 'search_rank']
+            filtered_rows = []
+            for row in rows:
+                filtered_row = []
+                for i, col in enumerate(columns):
+                    if col != 'search_rank':
+                        filtered_row.append(row[i])
+                filtered_rows.append(tuple(filtered_row))
+            
+            return [dict(zip(filtered_columns, row)) for row in filtered_rows]
     
     def get_movies_by_genre(self, genre: str, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
         """Get movies by genre"""

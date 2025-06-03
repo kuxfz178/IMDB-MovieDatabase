@@ -2067,5 +2067,5 @@ if __name__ == '__main__':
         exit(1)
     
     print("Starting IMDb Movies Server...")
-    print("Open http://localhost:8080 in your browser to explore the API")
-    app.run(debug=True, host='0.0.0.0', port=8080) 
+    print("Open http://localhost:8081 in your browser to explore the API")
+    app.run(debug=True, host='0.0.0.0', port=8081) 

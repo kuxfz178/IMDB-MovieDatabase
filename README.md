@@ -11,6 +11,24 @@ A Flask web application that serves IMDb movie data with search functionality, p
 - `imdb.db` - SQLite database file (created after setup)
 - `data/title.basics.tsv` - IMDb movie dataset (required)
 
+## Data Files
+
+Due to GitHub's file size limits, the large data files are not included in this repository. You have two options:
+
+### Option 1: Download Fresh from IMDb (Recommended)
+Run the automatic download script:
+```bash
+python download_data.py
+```
+
+### Option 2: Manual Download
+Download manually from IMDb:
+1. Go to [IMDb Datasets](https://datasets.imdbws.com/)
+2. Download `title.basics.tsv.gz` 
+3. Extract to `data/title.basics.tsv`
+
+**Note:** The database file (`imdb.db`) will be created automatically when you run the setup script.
+
 ## Setup from Source
 
 ### Prerequisites
@@ -141,4 +159,4 @@ app.run(debug=True, host='0.0.0.0', port=9000)
 - **Storage**: ~200MB for database, ~1GB for TSV processing
 - **Memory**: ~500MB during setup, ~50MB during operation  
 - **Setup Time**: 10-15 minutes for database initialization
-- **Performance**: <200ms for most queries 
+- **Performance**: <200ms for most queries

@@ -77,18 +77,18 @@ Movies loaded: 716,482
 python app.py
 ```
 
-The server starts on `http://localhost:8080`
+The server starts on `http://localhost:8081`
 
 ## How to Interact
 
 ### 1. API Documentation Page
-Visit `http://localhost:8080` to see:
+Visit `http://localhost:8081` to see:
 - Database statistics
 - Available API endpoints
 - Interactive testing buttons
 
 ### 2. Interactive Dashboard  
-Visit `http://localhost:8080/dashboard` for:
+Visit `http://localhost:8081/dashboard` for:
 - **Movie Search**: Search by title or browse by genre
 - **Want to Watch List**: Click ❤️ to add movies to your watchlist (stored in database)
 - **Already Watched**: Track movies you've seen with 👁️ button (stored in database)
@@ -152,7 +152,7 @@ Visit `http://localhost:8080/dashboard` for:
 
 **Database not found error**: Run `python database_setup.py` first
 
-**Port 8080 in use**: Change port in `app.py`:
+**Port 8081 in use**: Change port in `app.py`:
 ```python
 app.run(debug=True, host='0.0.0.0', port=9000)
 ```

@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+
+# Database (optional - you might want to exclude the large DB file)
+imdb.db
+
+# Large data files (optional - these are very large)
+data/*.tsv
+
+# MacOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Flask
+instance/
+.env

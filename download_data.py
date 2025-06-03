@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
 Download IMDb dataset files automatically
+
+This script downloads IMDb's non-commercial datasets for personal use.
+Data source: https://developer.imdb.com/non-commercial-datasets/
+Please ensure compliance with IMDb's terms and conditions.
 """
 
 import os
@@ -32,6 +36,8 @@ def download_and_extract(url, filename):
 def main():
     """Download all required IMDb dataset files"""
     print("🎬 Downloading IMDb dataset files...")
+    print("📋 Data source: https://developer.imdb.com/non-commercial-datasets/")
+    print("⚖️  For personal and non-commercial use only")
     print("This may take several minutes depending on your internet connection.\n")
     
     files_to_download = [

@@ -23,9 +23,12 @@ python download_data.py
 
 ### Option 2: Manual Download
 Download manually from IMDb:
-1. Go to [IMDb Datasets](https://datasets.imdbws.com/)
-2. Download `title.basics.tsv.gz` 
-3. Extract to `data/title.basics.tsv`
+1. Visit the [IMDb Non-Commercial Datasets](https://developer.imdb.com/non-commercial-datasets/) documentation
+2. Go to [IMDb Datasets](https://datasets.imdbws.com/) for direct downloads
+3. Download `title.basics.tsv.gz` 
+4. Extract to `data/title.basics.tsv`
+
+**Important:** This project uses IMDb's non-commercial datasets. Please ensure you comply with [IMDb's terms and conditions](https://developer.imdb.com/non-commercial-datasets/) for personal and non-commercial use.
 
 **Note:** The database file (`imdb.db`) will be created automatically when you run the setup script.
 

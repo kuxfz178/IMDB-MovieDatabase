@@ -90,11 +90,12 @@ Visit `http://localhost:8080` to see:
 ### 2. Interactive Dashboard  
 Visit `http://localhost:8080/dashboard` for:
 - **Movie Search**: Search by title or browse by genre
-- **Want to Watch List**: Click ❤️ to add movies to your watchlist (stored in browser)
-- **Already Watched**: Track movies you've seen with 👁️ button
+- **Want to Watch List**: Click ❤️ to add movies to your watchlist (stored in database)
+- **Already Watched**: Track movies you've seen with 👁️ button (stored in database)
 - **Personalized Recommendations**: Get suggestions based on your want to watch list
 - **Infinite Scroll**: Load more movies with "Load More" button
 - **Current Movies Only**: Filters out movies released after 2025
+- **Persistent Storage**: Your movie lists are saved in the database and persist across sessions
 
 ### 3. API Endpoints
 - `GET /api/movies/search?q=batman&limit=20&offset=0` - Search movies with pagination
@@ -105,6 +106,17 @@ Visit `http://localhost:8080/dashboard` for:
 - `GET /api/regex/search?pattern=^The.*&limit=20&offset=0` - Regex pattern search
 - `GET /api/search/advanced?q=Action+Comedy&type=genre_pattern` - Advanced search
 - `GET /api/views/recent_quality_movies` - Database views
+
+#### User Movie Lists API
+- `GET /api/user/want-to-watch` - Get user's want to watch movies
+- `POST /api/user/want-to-watch` - Add movie to want to watch list
+- `DELETE /api/user/want-to-watch` - Remove movie from want to watch list
+- `DELETE /api/user/want-to-watch/clear` - Clear entire want to watch list
+- `GET /api/user/watched` - Get user's watched movies
+- `POST /api/user/watched` - Add movie to watched list
+- `DELETE /api/user/watched` - Remove movie from watched list
+- `DELETE /api/user/watched/clear` - Clear entire watched list
+- `GET /api/user/lists/summary` - Get summary of user's movie lists
 
 **Note**: All search endpoints support `limit` (default 20) and `offset` (default 0) parameters for pagination.
 
@@ -156,6 +168,18 @@ app.run(debug=True, host='0.0.0.0', port=9000)
 - `runtimeMinutes` - Duration
 - `genres` - Comma-separated genres
 - `isAdult` - Content rating (0/1)
+
+**want_to_watch** table:
+- `id` - Auto-incrementing ID (Primary Key)
+- `user_session` - User session identifier
+- `tconst` - Movie ID (Foreign Key to movies.tconst)
+- `added_date` - When movie was added to list
+
+**watched_movies** table:
+- `id` - Auto-incrementing ID (Primary Key)
+- `user_session` - User session identifier
+- `tconst` - Movie ID (Foreign Key to movies.tconst)
+- `watched_date` - When movie was marked as watched
 
 ## System Requirements
 

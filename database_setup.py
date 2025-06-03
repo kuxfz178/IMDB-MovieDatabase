@@ -27,6 +27,29 @@ class IMDbDatabase:
             )
         ''')
         
+        # User movie lists tables
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS want_to_watch (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_session TEXT NOT NULL,
+                tconst TEXT NOT NULL,
+                added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tconst) REFERENCES movies (tconst),
+                UNIQUE(user_session, tconst)
+            )
+        ''')
+        
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS watched_movies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_session TEXT NOT NULL,
+                tconst TEXT NOT NULL,
+                watched_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (tconst) REFERENCES movies (tconst),
+                UNIQUE(user_session, tconst)
+            )
+        ''')
+        
         self.connection.commit()
         print("Tables created successfully!")
     

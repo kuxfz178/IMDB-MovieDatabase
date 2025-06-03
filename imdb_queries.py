@@ -632,4 +632,142 @@ class IMDbQueries:
                 return matching_movies
                 
             except re.error as e:
-                raise ValueError(f"Invalid regular expression: {e}") 
+                raise ValueError(f"Invalid regular expression: {e}")
+
+    # User Movie Lists Management
+    def add_to_want_to_watch(self, user_session: str, tconst: str) -> bool:
+        """Add a movie to user's want to watch list"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "INSERT OR IGNORE INTO want_to_watch (user_session, tconst) VALUES (?, ?)",
+                    (user_session, tconst)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                print(f"Error adding to want to watch: {e}")
+                return False
+
+    def remove_from_want_to_watch(self, user_session: str, tconst: str) -> bool:
+        """Remove a movie from user's want to watch list"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "DELETE FROM want_to_watch WHERE user_session = ? AND tconst = ?",
+                    (user_session, tconst)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                print(f"Error removing from want to watch: {e}")
+                return False
+
+    def get_want_to_watch_movies(self, user_session: str) -> List[Dict[str, Any]]:
+        """Get user's want to watch movies"""
+        with self._get_connection() as conn:
+            query = """
+                SELECT m.tconst, m.primaryTitle, m.originalTitle, m.startYear, 
+                       m.runtimeMinutes, m.genres, w.added_date
+                FROM want_to_watch w
+                JOIN movies m ON w.tconst = m.tconst
+                WHERE w.user_session = ?
+                ORDER BY w.added_date DESC
+            """
+            cursor = conn.cursor()
+            cursor.execute(query, (user_session,))
+            columns = [description[0] for description in cursor.description]
+            rows = cursor.fetchall()
+            return [dict(zip(columns, row)) for row in rows]
+
+    def add_to_watched(self, user_session: str, tconst: str) -> bool:
+        """Add a movie to user's watched list"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "INSERT OR IGNORE INTO watched_movies (user_session, tconst) VALUES (?, ?)",
+                    (user_session, tconst)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                print(f"Error adding to watched: {e}")
+                return False
+
+    def remove_from_watched(self, user_session: str, tconst: str) -> bool:
+        """Remove a movie from user's watched list"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "DELETE FROM watched_movies WHERE user_session = ? AND tconst = ?",
+                    (user_session, tconst)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+            except Exception as e:
+                print(f"Error removing from watched: {e}")
+                return False
+
+    def get_watched_movies(self, user_session: str) -> List[Dict[str, Any]]:
+        """Get user's watched movies"""
+        with self._get_connection() as conn:
+            query = """
+                SELECT m.tconst, m.primaryTitle, m.originalTitle, m.startYear, 
+                       m.runtimeMinutes, m.genres, w.watched_date
+                FROM watched_movies w
+                JOIN movies m ON w.tconst = m.tconst
+                WHERE w.user_session = ?
+                ORDER BY w.watched_date DESC
+            """
+            cursor = conn.cursor()
+            cursor.execute(query, (user_session,))
+            columns = [description[0] for description in cursor.description]
+            rows = cursor.fetchall()
+            return [dict(zip(columns, row)) for row in rows]
+
+    def clear_want_to_watch(self, user_session: str) -> bool:
+        """Clear all movies from user's want to watch list"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute("DELETE FROM want_to_watch WHERE user_session = ?", (user_session,))
+                conn.commit()
+                return True
+            except Exception as e:
+                print(f"Error clearing want to watch: {e}")
+                return False
+
+    def clear_watched(self, user_session: str) -> bool:
+        """Clear all movies from user's watched list"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute("DELETE FROM watched_movies WHERE user_session = ?", (user_session,))
+                conn.commit()
+                return True
+            except Exception as e:
+                print(f"Error clearing watched: {e}")
+                return False
+
+    def get_user_movie_lists_summary(self, user_session: str) -> Dict[str, Any]:
+        """Get summary of user's movie lists"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Count want to watch movies
+            cursor.execute("SELECT COUNT(*) FROM want_to_watch WHERE user_session = ?", (user_session,))
+            want_to_watch_count = cursor.fetchone()[0]
+            
+            # Count watched movies
+            cursor.execute("SELECT COUNT(*) FROM watched_movies WHERE user_session = ?", (user_session,))
+            watched_count = cursor.fetchone()[0]
+            
+            return {
+                'want_to_watch_count': want_to_watch_count,
+                'watched_count': watched_count,
+                'total_interactions': want_to_watch_count + watched_count
+            } 

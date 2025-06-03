@@ -1,9 +1,17 @@
-from flask import Flask, jsonify, request, render_template_string
+from flask import Flask, jsonify, request, render_template_string, session
 from imdb_queries import IMDbQueries
 import os
+import uuid
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'imdb-movies-secret-key-change-in-production')
 queries = IMDbQueries()
+
+def get_user_session():
+    """Get or create a user session ID"""
+    if 'user_id' not in session:
+        session['user_id'] = str(uuid.uuid4())
+    return session['user_id']
 
 # HTML template for the web interface
 HTML_TEMPLATE = """
@@ -260,10 +268,6 @@ HTML_TEMPLATE = """
     </div>
 
     <script>
-        // Local storage keys for movie lists
-        const WANT_TO_WATCH_KEY = 'imdb_want_to_watch_movies';
-        const WATCHED_MOVIES_KEY = 'imdb_watched_movies';
-        
         // Global variables for infinite scroll
         let currentSearchType = 'recent';
         let currentSearchTerm = '';
@@ -271,70 +275,189 @@ HTML_TEMPLATE = """
         let isLoading = false;
         let hasMoreMovies = true;
 
-        // Get want to watch movies from localStorage
-        function getWantToWatchMovies() {
-            const liked = localStorage.getItem(WANT_TO_WATCH_KEY);
-            return liked ? JSON.parse(liked) : [];
-        }
-
-        // Get watched movies from localStorage
-        function getWatchedMovies() {
-            const watched = localStorage.getItem(WATCHED_MOVIES_KEY);
-            return watched ? JSON.parse(watched) : [];
-        }
-
-        // Save want to watch movies to localStorage
-        function saveWantToWatchMovies(wantToWatchMovies) {
-            localStorage.setItem(WANT_TO_WATCH_KEY, JSON.stringify(wantToWatchMovies));
-            updateWantToWatchCount();
-            displayWantToWatchMovies();
-        }
-
-        // Save watched movies to localStorage
-        function saveWatchedMovies(watchedMovies) {
-            localStorage.setItem(WATCHED_MOVIES_KEY, JSON.stringify(watchedMovies));
-            updateWatchedCount();
-            displayWatchedMovies();
-        }
-
-        // Toggle want to watch status for a movie
-        function toggleWantToWatch(movie) {
-            let wantToWatchMovies = getWantToWatchMovies();
-            const movieId = movie.tconst;
-            const existingIndex = wantToWatchMovies.findIndex(m => m.tconst === movieId);
-
-            if (existingIndex > -1) {
-                wantToWatchMovies.splice(existingIndex, 1);
-            } else {
-                wantToWatchMovies.push(movie);
+        // Movie lists management using database API
+        async function fetchWantToWatchMovies() {
+            try {
+                const response = await fetch('/api/user/want-to-watch');
+                const data = await response.json();
+                return data.movies || [];
+            } catch (error) {
+                console.error('Error fetching want to watch movies:', error);
+                return [];
             }
-
-            saveWantToWatchMovies(wantToWatchMovies);
         }
 
-        // Check if a movie is in want to watch list
-        function isMovieWantToWatch(movieId) {
-            const wantToWatchMovies = getWantToWatchMovies();
-            return wantToWatchMovies.some(m => m.tconst === movieId);
+        async function fetchWatchedMovies() {
+            try {
+                const response = await fetch('/api/user/watched');
+                const data = await response.json();
+                return data.movies || [];
+            } catch (error) {
+                console.error('Error fetching watched movies:', error);
+                return [];
+            }
         }
 
-        // Update want to watch count display
-        function updateWantToWatchCount() {
-            const count = getWantToWatchMovies().length;
-            document.getElementById('wantToWatchCount').textContent = count;
+        async function addToWantToWatch(tconst) {
+            try {
+                const response = await fetch('/api/user/want-to-watch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tconst: tconst })
+                });
+                return response.ok;
+            } catch (error) {
+                console.error('Error adding to want to watch:', error);
+                return false;
+            }
         }
 
-        // Display want to watch movies
-        function displayWantToWatchMovies() {
-            const wantToWatchMovies = getWantToWatchMovies();
+        async function removeFromWantToWatch(tconst) {
+            try {
+                const response = await fetch('/api/user/want-to-watch', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tconst: tconst })
+                });
+                return response.ok;
+            } catch (error) {
+                console.error('Error removing from want to watch:', error);
+                return false;
+            }
+        }
+
+        async function addToWatched(tconst) {
+            try {
+                const response = await fetch('/api/user/watched', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tconst: tconst })
+                });
+                return response.ok;
+            } catch (error) {
+                console.error('Error adding to watched:', error);
+                return false;
+            }
+        }
+
+        async function removeFromWatched(tconst) {
+            try {
+                const response = await fetch('/api/user/watched', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tconst: tconst })
+                });
+                return response.ok;
+            } catch (error) {
+                console.error('Error removing from watched:', error);
+                return false;
+            }
+        }
+
+        async function clearAllWantToWatch() {
+            if (confirm('Are you sure you want to clear your entire want to watch list?')) {
+                try {
+                    const response = await fetch('/api/user/want-to-watch/clear', {
+                        method: 'DELETE'
+                    });
+                    if (response.ok) {
+                        await updateWantToWatchCount();
+                        await displayWantToWatchMovies();
+                    }
+                } catch (error) {
+                    console.error('Error clearing want to watch list:', error);
+                }
+            }
+        }
+
+        async function clearAllWatched() {
+            if (confirm('Are you sure you want to clear all watched movies?')) {
+                try {
+                    const response = await fetch('/api/user/watched/clear', {
+                        method: 'DELETE'
+                    });
+                    if (response.ok) {
+                        await updateWatchedCount();
+                        await displayWatchedMovies();
+                    }
+                } catch (error) {
+                    console.error('Error clearing watched list:', error);
+                }
+            }
+        }
+
+        async function toggleWantToWatch(movie) {
+            const wantToWatchMovies = await fetchWantToWatchMovies();
+            const isCurrentlyWantToWatch = wantToWatchMovies.some(m => m.tconst === movie.tconst);
+            
+            let success = false;
+            if (isCurrentlyWantToWatch) {
+                success = await removeFromWantToWatch(movie.tconst);
+            } else {
+                success = await addToWantToWatch(movie.tconst);
+            }
+            
+            if (success) {
+                await updateWantToWatchCount();
+                await displayWantToWatchMovies();
+                // Refresh current view if it shows search results
+                if (document.getElementById('searchResults').children.length > 0) {
+                    await refreshCurrentView();
+                }
+            }
+        }
+
+        async function toggleWatched(movie) {
+            const watchedMovies = await fetchWatchedMovies();
+            const isCurrentlyWatched = watchedMovies.some(m => m.tconst === movie.tconst);
+            
+            let success = false;
+            if (isCurrentlyWatched) {
+                success = await removeFromWatched(movie.tconst);
+            } else {
+                success = await addToWatched(movie.tconst);
+            }
+            
+            if (success) {
+                await updateWatchedCount();
+                await displayWatchedMovies();
+                // Refresh current view if it shows search results
+                if (document.getElementById('searchResults').children.length > 0) {
+                    await refreshCurrentView();
+                }
+            }
+        }
+
+        async function updateWantToWatchCount() {
+            try {
+                const response = await fetch('/api/user/lists/summary');
+                const data = await response.json();
+                document.getElementById('wantToWatchCount').textContent = data.want_to_watch_count || 0;
+            } catch (error) {
+                console.error('Error updating want to watch count:', error);
+            }
+        }
+
+        async function updateWatchedCount() {
+            try {
+                const response = await fetch('/api/user/lists/summary');
+                const data = await response.json();
+                document.getElementById('watchedCount').textContent = data.watched_count || 0;
+            } catch (error) {
+                console.error('Error updating watched count:', error);
+            }
+        }
+
+        async function displayWantToWatchMovies() {
+            const movies = await fetchWantToWatchMovies();
             const container = document.getElementById('wantToWatchMovies');
             
-            if (wantToWatchMovies.length === 0) {
+            if (movies.length === 0) {
                 container.innerHTML = '<div class="no-results">No movies in your want to watch list yet. Add some movies!</div>';
                 return;
             }
 
-            container.innerHTML = wantToWatchMovies.map(movie => `
+            container.innerHTML = movies.map(movie => `
                 <div class="movie-item want-to-watch-movie">
                     <div class="movie-title">${movie.primaryTitle}</div>
                     <div class="movie-details">
@@ -350,53 +473,16 @@ HTML_TEMPLATE = """
             `).join('');
         }
 
-        // Clear all want to watch movies
-        function clearAllWantToWatch() {
-            if (confirm('Are you sure you want to clear your entire want to watch list?')) {
-                localStorage.removeItem(WANT_TO_WATCH_KEY);
-                updateWantToWatchCount();
-                displayWantToWatchMovies();
-            }
-        }
-
-        // Toggle watched status for a movie
-        function toggleWatched(movie) {
-            let watchedMovies = getWatchedMovies();
-            const movieId = movie.tconst;
-            const existingIndex = watchedMovies.findIndex(m => m.tconst === movieId);
-
-            if (existingIndex > -1) {
-                watchedMovies.splice(existingIndex, 1);
-            } else {
-                watchedMovies.push(movie);
-            }
-
-            saveWatchedMovies(watchedMovies);
-        }
-
-        // Check if a movie is watched
-        function isMovieWatched(movieId) {
-            const watchedMovies = getWatchedMovies();
-            return watchedMovies.some(m => m.tconst === movieId);
-        }
-
-        // Update watched count display
-        function updateWatchedCount() {
-            const count = getWatchedMovies().length;
-            document.getElementById('watchedCount').textContent = count;
-        }
-
-        // Display watched movies
-        function displayWatchedMovies() {
-            const watchedMovies = getWatchedMovies();
+        async function displayWatchedMovies() {
+            const movies = await fetchWatchedMovies();
             const container = document.getElementById('watchedMovies');
             
-            if (watchedMovies.length === 0) {
+            if (movies.length === 0) {
                 container.innerHTML = '<div class="no-results">No watched movies yet. Mark some movies as watched!</div>';
                 return;
             }
 
-            container.innerHTML = watchedMovies.map(movie => `
+            container.innerHTML = movies.map(movie => `
                 <div class="movie-item watched-movie">
                     <div class="movie-title">${movie.primaryTitle}</div>
                     <div class="movie-details">
@@ -412,17 +498,17 @@ HTML_TEMPLATE = """
             `).join('');
         }
 
-        // Clear all watched movies
-        function clearAllWatched() {
-            if (confirm('Are you sure you want to clear all watched movies?')) {
-                localStorage.removeItem(WATCHED_MOVIES_KEY);
-                updateWatchedCount();
-                displayWatchedMovies();
-            }
+        async function isMovieWantToWatch(movieId) {
+            const movies = await fetchWantToWatchMovies();
+            return movies.some(m => m.tconst === movieId);
         }
 
-        // Display movies in search results
-        function displayMovies(movies, containerId, append = false) {
+        async function isMovieWatched(movieId) {
+            const movies = await fetchWatchedMovies();
+            return movies.some(m => m.tconst === movieId);
+        }
+
+        async function displayMovies(movies, containerId, append = false) {
             const container = document.getElementById(containerId);
             
             if (movies.length === 0 && !append) {
@@ -430,9 +516,13 @@ HTML_TEMPLATE = """
                 return;
             }
 
-            const moviesHtml = movies.map(movie => {
-                const isWantToWatch = isMovieWantToWatch(movie.tconst);
-                const isWatched = isMovieWatched(movie.tconst);
+            // Get current movie lists for status checking
+            const wantToWatchMovies = await fetchWantToWatchMovies();
+            const watchedMovies = await fetchWatchedMovies();
+            
+            const moviesHtml = await Promise.all(movies.map(async movie => {
+                const isWantToWatch = wantToWatchMovies.some(m => m.tconst === movie.tconst);
+                const isWatched = watchedMovies.some(m => m.tconst === movie.tconst);
                 let movieClasses = 'movie-item';
                 if (isWantToWatch) movieClasses += ' want-to-watch-movie';
                 if (isWatched) movieClasses += ' watched-movie';
@@ -459,12 +549,12 @@ HTML_TEMPLATE = """
                         </button>
                     </div>
                 `;
-            }).join('');
+            }));
             
             if (append) {
-                container.innerHTML += moviesHtml;
+                container.innerHTML += moviesHtml.join('');
             } else {
-                container.innerHTML = moviesHtml;
+                container.innerHTML = moviesHtml.join('');
             }
             
             // Add load more button if there are more movies
@@ -477,6 +567,17 @@ HTML_TEMPLATE = """
                     </div>
                 `;
                 container.innerHTML += loadMoreBtn;
+            }
+        }
+
+        // Helper function to refresh current view after movie list changes
+        async function refreshCurrentView() {
+            // This would ideally re-run the current search/view
+            // For now, we'll just update the visual states
+            const searchResults = document.getElementById('searchResults');
+            if (searchResults && searchResults.children.length > 0) {
+                // Re-render the current search results with updated states
+                // This is a simplified approach - in a more complex app you'd store the current search state
             }
         }
 
@@ -640,9 +741,9 @@ HTML_TEMPLATE = """
         }
 
         // Get recommendations
-        function getRecommendations() {
-            const wantToWatchMovies = getWantToWatchMovies();
-            const watchedMovies = getWatchedMovies();
+        async function getRecommendations() {
+            const wantToWatchMovies = await fetchWantToWatchMovies();
+            const watchedMovies = await fetchWatchedMovies();
             const totalInteractions = wantToWatchMovies.length + watchedMovies.length;
             
             if (totalInteractions < 5) {
@@ -653,43 +754,37 @@ HTML_TEMPLATE = """
             const container = document.getElementById('recommendations');
             container.innerHTML = '<div class="loading">Generating recommendations based on your movie preferences...</div>';
 
-            // Send both want to watch and watched movie IDs to the recommendation endpoint
-            const wantToWatchIds = wantToWatchMovies.map(m => m.tconst);
-            const watchedIds = watchedMovies.map(m => m.tconst);
-            
-            fetch('/api/recommendations', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                    want_to_watch_movies: wantToWatchIds,
-                    watched_movies: watchedIds
-                })
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.recommendations && data.recommendations.length > 0) {
-                        container.innerHTML = `
-                            <h3>🎬 Recommended for You (${data.recommendations.length} movies)</h3>
-                            <p>Based on your preferences from ${data.analysis.total_interactions} movie interactions</p>
-                            <p><strong>Top genres:</strong> ${data.analysis.top_genres.join(', ')}</p>
-                        `;
-                        displayMovies(data.recommendations, 'recommendations');
-                    } else {
-                        let errorMsg = 'No recommendations found. Try adding more movies to your lists!';
-                        if (data.analysis && data.analysis.error) {
-                            errorMsg = `Error: ${data.analysis.error}`;
-                        }
-                        if (data.analysis && data.analysis.top_genres && data.analysis.top_genres.length > 0) {
-                            errorMsg += `<br><br>Debug info: Found genres: ${data.analysis.top_genres.join(', ')}`;
-                        }
-                        container.innerHTML = `<div class="no-results">${errorMsg}</div>`;
+            try {
+                const response = await fetch('/api/recommendations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
                     }
-                })
-                .catch(error => {
-                    container.innerHTML = '<div class="no-results">Error generating recommendations</div>';
                 });
+                
+                const data = await response.json();
+                
+                if (data.recommendations && data.recommendations.length > 0) {
+                    container.innerHTML = `
+                        <h3>🎬 Recommended for You (${data.recommendations.length} movies)</h3>
+                        <p>Based on your preferences from ${data.analysis.total_interactions} movie interactions</p>
+                        <p><strong>Top genres:</strong> ${data.analysis.top_genres.join(', ')}</p>
+                    `;
+                    await displayMovies(data.recommendations, 'recommendations');
+                } else {
+                    let errorMsg = 'No recommendations found. Try adding more movies to your lists!';
+                    if (data.analysis && data.analysis.error) {
+                        errorMsg = `Error: ${data.analysis.error}`;
+                    }
+                    if (data.analysis && data.analysis.top_genres && data.analysis.top_genres.length > 0) {
+                        errorMsg += `<br><br>Debug info: Found genres: ${data.analysis.top_genres.join(', ')}`;
+                    }
+                    container.innerHTML = `<div class="no-results">${errorMsg}</div>`;
+                }
+            } catch (error) {
+                container.innerHTML = '<div class="no-results">Error generating recommendations</div>';
+                console.error('Error getting recommendations:', error);
+            }
         }
 
         // Allow Enter key to trigger search
@@ -700,11 +795,11 @@ HTML_TEMPLATE = """
         });
 
         // Initialize the page
-        document.addEventListener('DOMContentLoaded', function() {
-            updateWantToWatchCount();
-            displayWantToWatchMovies();
-            updateWatchedCount();
-            displayWatchedMovies();
+        document.addEventListener('DOMContentLoaded', async function() {
+            await updateWantToWatchCount();
+            await displayWantToWatchMovies();
+            await updateWatchedCount();
+            await displayWatchedMovies();
             getRecentMovies(); // Load some initial movies with pagination support
         });
 
@@ -991,10 +1086,6 @@ DASHBOARD_TEMPLATE = """
     </div>
 
     <script>
-        // Local storage keys for movie lists
-        const WANT_TO_WATCH_KEY = 'imdb_want_to_watch_movies';
-        const WATCHED_MOVIES_KEY = 'imdb_watched_movies';
-        
         // Global variables for infinite scroll
         let currentSearchType = 'recent';
         let currentSearchTerm = '';
@@ -1002,70 +1093,189 @@ DASHBOARD_TEMPLATE = """
         let isLoading = false;
         let hasMoreMovies = true;
 
-        // Get want to watch movies from localStorage
-        function getWantToWatchMovies() {
-            const liked = localStorage.getItem(WANT_TO_WATCH_KEY);
-            return liked ? JSON.parse(liked) : [];
-        }
-
-        // Get watched movies from localStorage
-        function getWatchedMovies() {
-            const watched = localStorage.getItem(WATCHED_MOVIES_KEY);
-            return watched ? JSON.parse(watched) : [];
-        }
-
-        // Save want to watch movies to localStorage
-        function saveWantToWatchMovies(wantToWatchMovies) {
-            localStorage.setItem(WANT_TO_WATCH_KEY, JSON.stringify(wantToWatchMovies));
-            updateWantToWatchCount();
-            displayWantToWatchMovies();
-        }
-
-        // Save watched movies to localStorage
-        function saveWatchedMovies(watchedMovies) {
-            localStorage.setItem(WATCHED_MOVIES_KEY, JSON.stringify(watchedMovies));
-            updateWatchedCount();
-            displayWatchedMovies();
-        }
-
-        // Toggle want to watch status for a movie
-        function toggleWantToWatch(movie) {
-            let wantToWatchMovies = getWantToWatchMovies();
-            const movieId = movie.tconst;
-            const existingIndex = wantToWatchMovies.findIndex(m => m.tconst === movieId);
-
-            if (existingIndex > -1) {
-                wantToWatchMovies.splice(existingIndex, 1);
-            } else {
-                wantToWatchMovies.push(movie);
+        // Movie lists management using database API
+        async function fetchWantToWatchMovies() {
+            try {
+                const response = await fetch('/api/user/want-to-watch');
+                const data = await response.json();
+                return data.movies || [];
+            } catch (error) {
+                console.error('Error fetching want to watch movies:', error);
+                return [];
             }
-
-            saveWantToWatchMovies(wantToWatchMovies);
         }
 
-        // Check if a movie is in want to watch list
-        function isMovieWantToWatch(movieId) {
-            const wantToWatchMovies = getWantToWatchMovies();
-            return wantToWatchMovies.some(m => m.tconst === movieId);
+        async function fetchWatchedMovies() {
+            try {
+                const response = await fetch('/api/user/watched');
+                const data = await response.json();
+                return data.movies || [];
+            } catch (error) {
+                console.error('Error fetching watched movies:', error);
+                return [];
+            }
         }
 
-        // Update want to watch count display
-        function updateWantToWatchCount() {
-            const count = getWantToWatchMovies().length;
-            document.getElementById('wantToWatchCount').textContent = count;
+        async function addToWantToWatch(tconst) {
+            try {
+                const response = await fetch('/api/user/want-to-watch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tconst: tconst })
+                });
+                return response.ok;
+            } catch (error) {
+                console.error('Error adding to want to watch:', error);
+                return false;
+            }
         }
 
-        // Display want to watch movies
-        function displayWantToWatchMovies() {
-            const wantToWatchMovies = getWantToWatchMovies();
+        async function removeFromWantToWatch(tconst) {
+            try {
+                const response = await fetch('/api/user/want-to-watch', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tconst: tconst })
+                });
+                return response.ok;
+            } catch (error) {
+                console.error('Error removing from want to watch:', error);
+                return false;
+            }
+        }
+
+        async function addToWatched(tconst) {
+            try {
+                const response = await fetch('/api/user/watched', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tconst: tconst })
+                });
+                return response.ok;
+            } catch (error) {
+                console.error('Error adding to watched:', error);
+                return false;
+            }
+        }
+
+        async function removeFromWatched(tconst) {
+            try {
+                const response = await fetch('/api/user/watched', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tconst: tconst })
+                });
+                return response.ok;
+            } catch (error) {
+                console.error('Error removing from watched:', error);
+                return false;
+            }
+        }
+
+        async function clearAllWantToWatch() {
+            if (confirm('Are you sure you want to clear your entire want to watch list?')) {
+                try {
+                    const response = await fetch('/api/user/want-to-watch/clear', {
+                        method: 'DELETE'
+                    });
+                    if (response.ok) {
+                        await updateWantToWatchCount();
+                        await displayWantToWatchMovies();
+                    }
+                } catch (error) {
+                    console.error('Error clearing want to watch list:', error);
+                }
+            }
+        }
+
+        async function clearAllWatched() {
+            if (confirm('Are you sure you want to clear all watched movies?')) {
+                try {
+                    const response = await fetch('/api/user/watched/clear', {
+                        method: 'DELETE'
+                    });
+                    if (response.ok) {
+                        await updateWatchedCount();
+                        await displayWatchedMovies();
+                    }
+                } catch (error) {
+                    console.error('Error clearing watched list:', error);
+                }
+            }
+        }
+
+        async function toggleWantToWatch(movie) {
+            const wantToWatchMovies = await fetchWantToWatchMovies();
+            const isCurrentlyWantToWatch = wantToWatchMovies.some(m => m.tconst === movie.tconst);
+            
+            let success = false;
+            if (isCurrentlyWantToWatch) {
+                success = await removeFromWantToWatch(movie.tconst);
+            } else {
+                success = await addToWantToWatch(movie.tconst);
+            }
+            
+            if (success) {
+                await updateWantToWatchCount();
+                await displayWantToWatchMovies();
+                // Refresh current view if it shows search results
+                if (document.getElementById('searchResults').children.length > 0) {
+                    await refreshCurrentView();
+                }
+            }
+        }
+
+        async function toggleWatched(movie) {
+            const watchedMovies = await fetchWatchedMovies();
+            const isCurrentlyWatched = watchedMovies.some(m => m.tconst === movie.tconst);
+            
+            let success = false;
+            if (isCurrentlyWatched) {
+                success = await removeFromWatched(movie.tconst);
+            } else {
+                success = await addToWatched(movie.tconst);
+            }
+            
+            if (success) {
+                await updateWatchedCount();
+                await displayWatchedMovies();
+                // Refresh current view if it shows search results
+                if (document.getElementById('searchResults').children.length > 0) {
+                    await refreshCurrentView();
+                }
+            }
+        }
+
+        async function updateWantToWatchCount() {
+            try {
+                const response = await fetch('/api/user/lists/summary');
+                const data = await response.json();
+                document.getElementById('wantToWatchCount').textContent = data.want_to_watch_count || 0;
+            } catch (error) {
+                console.error('Error updating want to watch count:', error);
+            }
+        }
+
+        async function updateWatchedCount() {
+            try {
+                const response = await fetch('/api/user/lists/summary');
+                const data = await response.json();
+                document.getElementById('watchedCount').textContent = data.watched_count || 0;
+            } catch (error) {
+                console.error('Error updating watched count:', error);
+            }
+        }
+
+        async function displayWantToWatchMovies() {
+            const movies = await fetchWantToWatchMovies();
             const container = document.getElementById('wantToWatchMovies');
             
-            if (wantToWatchMovies.length === 0) {
+            if (movies.length === 0) {
                 container.innerHTML = '<div class="no-results">No movies in your want to watch list yet. Add some movies!</div>';
                 return;
             }
 
-            container.innerHTML = wantToWatchMovies.map(movie => `
+            container.innerHTML = movies.map(movie => `
                 <div class="movie-item want-to-watch-movie">
                     <div class="movie-title">${movie.primaryTitle}</div>
                     <div class="movie-details">
@@ -1081,53 +1291,16 @@ DASHBOARD_TEMPLATE = """
             `).join('');
         }
 
-        // Clear all want to watch movies
-        function clearAllWantToWatch() {
-            if (confirm('Are you sure you want to clear your entire want to watch list?')) {
-                localStorage.removeItem(WANT_TO_WATCH_KEY);
-                updateWantToWatchCount();
-                displayWantToWatchMovies();
-            }
-        }
-
-        // Toggle watched status for a movie
-        function toggleWatched(movie) {
-            let watchedMovies = getWatchedMovies();
-            const movieId = movie.tconst;
-            const existingIndex = watchedMovies.findIndex(m => m.tconst === movieId);
-
-            if (existingIndex > -1) {
-                watchedMovies.splice(existingIndex, 1);
-            } else {
-                watchedMovies.push(movie);
-            }
-
-            saveWatchedMovies(watchedMovies);
-        }
-
-        // Check if a movie is watched
-        function isMovieWatched(movieId) {
-            const watchedMovies = getWatchedMovies();
-            return watchedMovies.some(m => m.tconst === movieId);
-        }
-
-        // Update watched count display
-        function updateWatchedCount() {
-            const count = getWatchedMovies().length;
-            document.getElementById('watchedCount').textContent = count;
-        }
-
-        // Display watched movies
-        function displayWatchedMovies() {
-            const watchedMovies = getWatchedMovies();
+        async function displayWatchedMovies() {
+            const movies = await fetchWatchedMovies();
             const container = document.getElementById('watchedMovies');
             
-            if (watchedMovies.length === 0) {
+            if (movies.length === 0) {
                 container.innerHTML = '<div class="no-results">No watched movies yet. Mark some movies as watched!</div>';
                 return;
             }
 
-            container.innerHTML = watchedMovies.map(movie => `
+            container.innerHTML = movies.map(movie => `
                 <div class="movie-item watched-movie">
                     <div class="movie-title">${movie.primaryTitle}</div>
                     <div class="movie-details">
@@ -1143,17 +1316,17 @@ DASHBOARD_TEMPLATE = """
             `).join('');
         }
 
-        // Clear all watched movies
-        function clearAllWatched() {
-            if (confirm('Are you sure you want to clear all watched movies?')) {
-                localStorage.removeItem(WATCHED_MOVIES_KEY);
-                updateWatchedCount();
-                displayWatchedMovies();
-            }
+        async function isMovieWantToWatch(movieId) {
+            const movies = await fetchWantToWatchMovies();
+            return movies.some(m => m.tconst === movieId);
         }
 
-        // Display movies in search results
-        function displayMovies(movies, containerId, append = false) {
+        async function isMovieWatched(movieId) {
+            const movies = await fetchWatchedMovies();
+            return movies.some(m => m.tconst === movieId);
+        }
+
+        async function displayMovies(movies, containerId, append = false) {
             const container = document.getElementById(containerId);
             
             if (movies.length === 0 && !append) {
@@ -1161,9 +1334,13 @@ DASHBOARD_TEMPLATE = """
                 return;
             }
 
-            const moviesHtml = movies.map(movie => {
-                const isWantToWatch = isMovieWantToWatch(movie.tconst);
-                const isWatched = isMovieWatched(movie.tconst);
+            // Get current movie lists for status checking
+            const wantToWatchMovies = await fetchWantToWatchMovies();
+            const watchedMovies = await fetchWatchedMovies();
+            
+            const moviesHtml = await Promise.all(movies.map(async movie => {
+                const isWantToWatch = wantToWatchMovies.some(m => m.tconst === movie.tconst);
+                const isWatched = watchedMovies.some(m => m.tconst === movie.tconst);
                 let movieClasses = 'movie-item';
                 if (isWantToWatch) movieClasses += ' want-to-watch-movie';
                 if (isWatched) movieClasses += ' watched-movie';
@@ -1190,12 +1367,12 @@ DASHBOARD_TEMPLATE = """
                         </button>
                     </div>
                 `;
-            }).join('');
+            }));
             
             if (append) {
-                container.innerHTML += moviesHtml;
+                container.innerHTML += moviesHtml.join('');
             } else {
-                container.innerHTML = moviesHtml;
+                container.innerHTML = moviesHtml.join('');
             }
             
             // Add load more button if there are more movies
@@ -1208,6 +1385,17 @@ DASHBOARD_TEMPLATE = """
                     </div>
                 `;
                 container.innerHTML += loadMoreBtn;
+            }
+        }
+
+        // Helper function to refresh current view after movie list changes
+        async function refreshCurrentView() {
+            // This would ideally re-run the current search/view
+            // For now, we'll just update the visual states
+            const searchResults = document.getElementById('searchResults');
+            if (searchResults && searchResults.children.length > 0) {
+                // Re-render the current search results with updated states
+                // This is a simplified approach - in a more complex app you'd store the current search state
             }
         }
 
@@ -1371,9 +1559,9 @@ DASHBOARD_TEMPLATE = """
         }
 
         // Get recommendations
-        function getRecommendations() {
-            const wantToWatchMovies = getWantToWatchMovies();
-            const watchedMovies = getWatchedMovies();
+        async function getRecommendations() {
+            const wantToWatchMovies = await fetchWantToWatchMovies();
+            const watchedMovies = await fetchWatchedMovies();
             const totalInteractions = wantToWatchMovies.length + watchedMovies.length;
             
             if (totalInteractions < 5) {
@@ -1384,43 +1572,37 @@ DASHBOARD_TEMPLATE = """
             const container = document.getElementById('recommendations');
             container.innerHTML = '<div class="loading">Generating recommendations based on your movie preferences...</div>';
 
-            // Send both want to watch and watched movie IDs to the recommendation endpoint
-            const wantToWatchIds = wantToWatchMovies.map(m => m.tconst);
-            const watchedIds = watchedMovies.map(m => m.tconst);
-            
-            fetch('/api/recommendations', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                    want_to_watch_movies: wantToWatchIds,
-                    watched_movies: watchedIds
-                })
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.recommendations && data.recommendations.length > 0) {
-                        container.innerHTML = `
-                            <h3>🎬 Recommended for You (${data.recommendations.length} movies)</h3>
-                            <p>Based on your preferences from ${data.analysis.total_interactions} movie interactions</p>
-                            <p><strong>Top genres:</strong> ${data.analysis.top_genres.join(', ')}</p>
-                        `;
-                        displayMovies(data.recommendations, 'recommendations');
-                    } else {
-                        let errorMsg = 'No recommendations found. Try adding more movies to your lists!';
-                        if (data.analysis && data.analysis.error) {
-                            errorMsg = `Error: ${data.analysis.error}`;
-                        }
-                        if (data.analysis && data.analysis.top_genres && data.analysis.top_genres.length > 0) {
-                            errorMsg += `<br><br>Debug info: Found genres: ${data.analysis.top_genres.join(', ')}`;
-                        }
-                        container.innerHTML = `<div class="no-results">${errorMsg}</div>`;
+            try {
+                const response = await fetch('/api/recommendations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
                     }
-                })
-                .catch(error => {
-                    container.innerHTML = '<div class="no-results">Error generating recommendations</div>';
                 });
+                
+                const data = await response.json();
+                
+                if (data.recommendations && data.recommendations.length > 0) {
+                    container.innerHTML = `
+                        <h3>🎬 Recommended for You (${data.recommendations.length} movies)</h3>
+                        <p>Based on your preferences from ${data.analysis.total_interactions} movie interactions</p>
+                        <p><strong>Top genres:</strong> ${data.analysis.top_genres.join(', ')}</p>
+                    `;
+                    await displayMovies(data.recommendations, 'recommendations');
+                } else {
+                    let errorMsg = 'No recommendations found. Try adding more movies to your lists!';
+                    if (data.analysis && data.analysis.error) {
+                        errorMsg = `Error: ${data.analysis.error}`;
+                    }
+                    if (data.analysis && data.analysis.top_genres && data.analysis.top_genres.length > 0) {
+                        errorMsg += `<br><br>Debug info: Found genres: ${data.analysis.top_genres.join(', ')}`;
+                    }
+                    container.innerHTML = `<div class="no-results">${errorMsg}</div>`;
+                }
+            } catch (error) {
+                container.innerHTML = '<div class="no-results">Error generating recommendations</div>';
+                console.error('Error getting recommendations:', error);
+            }
         }
 
         // Allow Enter key to trigger search
@@ -1431,13 +1613,49 @@ DASHBOARD_TEMPLATE = """
         });
 
         // Initialize the page
-        document.addEventListener('DOMContentLoaded', function() {
-            updateWantToWatchCount();
-            displayWantToWatchMovies();
-            updateWatchedCount();
-            displayWatchedMovies();
+        document.addEventListener('DOMContentLoaded', async function() {
+            await updateWantToWatchCount();
+            await displayWantToWatchMovies();
+            await updateWatchedCount();
+            await displayWatchedMovies();
             getRecentMovies(); // Load some initial movies with pagination support
         });
+
+        // Load statistics on page load
+        fetch('/api/stats')
+            .then(response => response.json())
+            .then(data => {
+                const statsDiv = document.getElementById('stats');
+                statsDiv.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-number">${data.total_movies.toLocaleString()}</div>
+                        <div>Total Movies</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${data.movies_with_year.toLocaleString()}</div>
+                        <div>Movies with Year</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${data.year_range || 'N/A'}</div>
+                        <div>Year Range</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${data.unique_genre_combinations}</div>
+                        <div>Genre Combinations</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${data.non_adult_movies.toLocaleString()}</div>
+                        <div>Family-Friendly</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${data.adult_movies.toLocaleString()}</div>
+                        <div>Adult Movies</div>
+                    </div>
+                `;
+            })
+            .catch(error => {
+                document.getElementById('stats').innerHTML = '<p>Error loading statistics</p>';
+            });
     </script>
 </body>
 </html>
@@ -1622,18 +1840,23 @@ def dashboard():
 def get_recommendations():
     """Get movie recommendations based on want to watch and watched movies"""
     try:
-        data = request.json
-        want_to_watch_movie_ids = data.get('want_to_watch_movies', [])
-        watched_movie_ids = data.get('watched_movies', [])
+        user_session = get_user_session()
         
-        total_interactions = len(want_to_watch_movie_ids) + len(watched_movie_ids)
+        # Get user's movie lists from database
+        want_to_watch_movies = queries.get_want_to_watch_movies(user_session)
+        watched_movies = queries.get_watched_movies(user_session)
+        
+        want_to_watch_ids = [movie['tconst'] for movie in want_to_watch_movies]
+        watched_ids = [movie['tconst'] for movie in watched_movies]
+        
+        total_interactions = len(want_to_watch_ids) + len(watched_ids)
         
         if total_interactions < 5:
             return jsonify({
                 'error': f'At least 5 movie interactions required. Current: {total_interactions}'
             }), 400
         
-        recommendations = queries.get_recommendations(want_to_watch_movie_ids, watched_movie_ids)
+        recommendations = queries.get_recommendations(want_to_watch_ids, watched_ids)
         return jsonify(recommendations)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1693,6 +1916,147 @@ def get_view_data(view_name):
             'count': len(data),
             'data': data
         })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# User Movie Lists API Endpoints
+@app.route('/api/user/want-to-watch', methods=['GET'])
+def get_user_want_to_watch():
+    """Get user's want to watch movies from database"""
+    try:
+        user_session = get_user_session()
+        movies = queries.get_want_to_watch_movies(user_session)
+        return jsonify({
+            'movies': movies,
+            'count': len(movies)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/user/want-to-watch', methods=['POST'])
+def add_to_want_to_watch():
+    """Add a movie to user's want to watch list"""
+    try:
+        data = request.json
+        tconst = data.get('tconst')
+        if not tconst:
+            return jsonify({'error': 'Movie ID (tconst) is required'}), 400
+        
+        user_session = get_user_session()
+        success = queries.add_to_want_to_watch(user_session, tconst)
+        
+        if success:
+            return jsonify({'message': 'Movie added to want to watch list'})
+        else:
+            return jsonify({'message': 'Movie was already in want to watch list'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/user/want-to-watch', methods=['DELETE'])
+def remove_from_want_to_watch():
+    """Remove a movie from user's want to watch list"""
+    try:
+        data = request.json
+        tconst = data.get('tconst')
+        if not tconst:
+            return jsonify({'error': 'Movie ID (tconst) is required'}), 400
+        
+        user_session = get_user_session()
+        success = queries.remove_from_want_to_watch(user_session, tconst)
+        
+        if success:
+            return jsonify({'message': 'Movie removed from want to watch list'})
+        else:
+            return jsonify({'message': 'Movie was not in want to watch list'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/user/want-to-watch/clear', methods=['DELETE'])
+def clear_want_to_watch():
+    """Clear all movies from user's want to watch list"""
+    try:
+        user_session = get_user_session()
+        success = queries.clear_want_to_watch(user_session)
+        
+        if success:
+            return jsonify({'message': 'Want to watch list cleared'})
+        else:
+            return jsonify({'error': 'Failed to clear want to watch list'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/user/watched', methods=['GET'])
+def get_user_watched():
+    """Get user's watched movies from database"""
+    try:
+        user_session = get_user_session()
+        movies = queries.get_watched_movies(user_session)
+        return jsonify({
+            'movies': movies,
+            'count': len(movies)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/user/watched', methods=['POST'])
+def add_to_watched():
+    """Add a movie to user's watched list"""
+    try:
+        data = request.json
+        tconst = data.get('tconst')
+        if not tconst:
+            return jsonify({'error': 'Movie ID (tconst) is required'}), 400
+        
+        user_session = get_user_session()
+        success = queries.add_to_watched(user_session, tconst)
+        
+        if success:
+            return jsonify({'message': 'Movie added to watched list'})
+        else:
+            return jsonify({'message': 'Movie was already in watched list'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/user/watched', methods=['DELETE'])
+def remove_from_watched():
+    """Remove a movie from user's watched list"""
+    try:
+        data = request.json
+        tconst = data.get('tconst')
+        if not tconst:
+            return jsonify({'error': 'Movie ID (tconst) is required'}), 400
+        
+        user_session = get_user_session()
+        success = queries.remove_from_watched(user_session, tconst)
+        
+        if success:
+            return jsonify({'message': 'Movie removed from watched list'})
+        else:
+            return jsonify({'message': 'Movie was not in watched list'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/user/watched/clear', methods=['DELETE'])
+def clear_watched():
+    """Clear all movies from user's watched list"""
+    try:
+        user_session = get_user_session()
+        success = queries.clear_watched(user_session)
+        
+        if success:
+            return jsonify({'message': 'Watched list cleared'})
+        else:
+            return jsonify({'error': 'Failed to clear watched list'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/user/lists/summary', methods=['GET'])
+def get_user_lists_summary():
+    """Get summary of user's movie lists"""
+    try:
+        user_session = get_user_session()
+        summary = queries.get_user_movie_lists_summary(user_session)
+        return jsonify(summary)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

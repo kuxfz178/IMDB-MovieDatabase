@@ -12,6 +12,9 @@ import urllib.request
 import gzip
 import shutil
 
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
 def download_and_extract(url, filename):
     """Download and extract a gzipped file"""
     print(f"Downloading {filename}...")

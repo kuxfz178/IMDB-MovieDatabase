@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IMDb Movies Database</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .endpoint {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .endpoint h3 {
+            color: #495057;
+        }
+        .method {
+            background: #007bff;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .url {
+            font-family: monospace;
+            background: #e9ecef;
+            padding: 5px 10px;
+            border-radius: 3px;
+            margin: 5px 0;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #1976d2;
+        }
+        .btn {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .btn-large {
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎬 IMDb Movies Database</h1>
+        <p>RESTful API for exploring movie data from IMDb</p>
+        <a href="/dashboard" class="btn" style="margin-top: 15px;">Go to Dashboard</a>
+    </div>
+
+    <div class="container">
+        <h2>Database Statistics</h2>
+        <div class="stats" id="stats">
+            Loading statistics...
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Available Endpoints</h2>
+        
+        <div class="endpoint">
+            <h3><span class="method">GET</span> Database Statistics</h3>
+            <div class="url">/api/stats</div>
+            <p>Get overall database statistics including movie counts and coverage.</p>
+            <a href="/api/stats" class="btn">Try it</a>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="method">GET</span> Sample Movies</h3>
+            <div class="url">/api/movies?limit=10</div>
+            <p>Get sample movies from the database.</p>
+            <a href="/api/movies?limit=10" class="btn">Try it</a>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="method">GET</span> Movies by Year</h3>
+            <div class="url">/api/movies/year/2023?limit=10</div>
+            <p>Get movies released in a specific year.</p>
+            <a href="/api/movies/year/2023?limit=10" class="btn">2023 Movies</a>
+            <a href="/api/movies/year/2020?limit=10" class="btn">2020 Movies</a>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="method">GET</span> Movies by Year Range</h3>
+            <div class="url">/api/movies/years/2020/2023?limit=10</div>
+            <p>Get movies released within a year range.</p>
+            <a href="/api/movies/years/2020/2023?limit=10" class="btn">2020-2023</a>
+            <a href="/api/movies/years/2010/2015?limit=10" class="btn">2010-2015</a>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="method">GET</span> Search Movies</h3>
+            <div class="url">/api/movies/search?q=batman&limit=10</div>
+            <p>Search for movies by title (both primary and original titles).</p>
+            <a href="/api/movies/search?q=batman&limit=10" class="btn">Search Batman</a>
+            <a href="/api/movies/search?q=star&limit=10" class="btn">Search Star</a>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="method">GET</span> Movies by Genre</h3>
+            <div class="url">/api/movies/genre/Action?limit=10</div>
+            <p>Get movies by genre (Action, Comedy, Drama, etc.).</p>
+            <a href="/api/movies/genre/Action?limit=10" class="btn">Action</a>
+            <a href="/api/movies/genre/Comedy?limit=10" class="btn">Comedy</a>
+            <a href="/api/movies/genre/Drama?limit=10" class="btn">Drama</a>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="method">GET</span> Movies by Runtime</h3>
+            <div class="url">/api/movies/runtime/90/120?limit=10</div>
+            <p>Get movies within a specific runtime range (in minutes).</p>
+            <a href="/api/movies/runtime/90/120?limit=10" class="btn">90-120 min</a>
+            <a href="/api/movies/runtime/120/180?limit=10" class="btn">2-3 hours</a>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="method">GET</span> Longest Movies</h3>
+            <div class="url">/api/movies/longest?limit=10</div>
+            <p>Get the longest movies by runtime.</p>
+            <a href="/api/movies/longest?limit=10" class="btn">Try it</a>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="method">GET</span> Recent Movies</h3>
+            <div class="url">/api/movies/recent?limit=10</div>
+            <p>Get the most recently released movies.</p>
+            <a href="/api/movies/recent?limit=10" class="btn">Try it</a>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="method">GET</span> Movies Statistics by Year</h3>
+            <div class="url">/api/stats/years</div>
+            <p>Get movie count statistics by year (last 30 years).</p>
+            <a href="/api/stats/years" class="btn">Try it</a>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="method">GET</span> Genre Statistics</h3>
+            <div class="url">/api/stats/genres</div>
+            <p>Get statistics showing movie counts by genre combinations.</p>
+            <a href="/api/stats/genres" class="btn">Try it</a>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="method">GET</span> Runtime Statistics</h3>
+            <div class="url">/api/stats/runtime</div>
+            <p>Get runtime statistics (average, min, max).</p>
+            <a href="/api/stats/runtime" class="btn">Try it</a>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="method">GET</span> Advanced Search</h3>
+            <div class="url">/api/search/advanced?q=action&type=genre_pattern</div>
+            <p>Advanced search with pattern matching. Types: basic, regex, year_pattern, genre_pattern</p>
+            <a href="/api/search/advanced?q=Action+Comedy&type=genre_pattern&limit=5" class="btn">Action+Comedy</a>
+            <a href="/api/search/advanced?q=199*&type=year_pattern&limit=5" class="btn">1990s Movies</a>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="method">GET</span> Regex Search</h3>
+            <div class="url">/api/regex/search?pattern=^The.*man$</div>
+            <p>Search movie titles using regular expressions.</p>
+            <a href="/api/regex/search?pattern=^The.*&limit=5" class="btn">Starts with "The"</a>
+            <a href="/api/regex/search?pattern=.*[0-9]+.*&limit=5" class="btn">Contains Numbers</a>
+        </div>
+
+        <div class="endpoint">
+            <h3><span class="method">GET</span> Database Views</h3>
+            <div class="url">/api/views/recent_quality_movies</div>
+            <p>Access organized data through database views.</p>
+            <a href="/api/views/recent_quality_movies?limit=10" class="btn">Recent Quality</a>
+            <a href="/api/views/genre_stats_view?limit=10" class="btn">Genre Stats</a>
+            <a href="/api/views/decade_summary?limit=10" class="btn">By Decade</a>
+        </div>
+    </div>
+
+    <script>
+        // Load statistics on page load
+        fetch('/api/stats')
+            .then(response => response.json())
+            .then(data => {
+                const statsDiv = document.getElementById('stats');
+                statsDiv.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-number">${data.total_movies.toLocaleString()}</div>
+                        <div>Total Movies</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${data.movies_with_year.toLocaleString()}</div>
+                        <div>Movies with Year</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${data.year_range || 'N/A'}</div>
+                        <div>Year Range</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${data.unique_genre_combinations}</div>
+                        <div>Genre Combinations</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${data.non_adult_movies.toLocaleString()}</div>
+                        <div>Family-Friendly</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${data.adult_movies.toLocaleString()}</div>
+                        <div>Adult Movies</div>
+                    </div>
+                `;
+            })
+            .catch(error => {
+                console.error('Error loading statistics:', error);
+                document.getElementById('stats').innerHTML = '<p>Error loading statistics</p>';
+            });
+    </script>
+</body>
+</html>
